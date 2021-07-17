@@ -1,6 +1,5 @@
 # **TXTIMG - image to text converter**
-**Simple command line program that can turn any image to ascii text.**
-\
+**Simple command line program that can turn any image to ascii text.**\
 \
 
 # how to use
