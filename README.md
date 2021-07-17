@@ -2,6 +2,9 @@
 **Simple command line program that can turn any image to ascii text.**  
 <br/>
 <br/>
+![GitHub Logo](/Screenshot_47.png)
+![GitHub Logo](/Screenshot_48.png)
+<br/>
 # how to use
 input parameters: **path** and **pixel step**  
 ..\txtimg\txtimg.exe C:\path\to\some\picture.jpg 16  
