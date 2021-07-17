@@ -9,47 +9,49 @@
 
 
 #ifdef TXTIMG_DEBUG
-#define PRINTBOOL(b) printf(#b " = %s\n", (b) ? "true" : "false");
-#define PRINTINT(i) printf(#i " = %i\n", (i));
+#define TXIMG_PRINTBOOL(b) printf(#b " = %s\n", (b) ? "true" : "false");
+#define TXIMG_PRINTINT(i) printf(#i " = %i\n", (i));
 #define TXTIMG_ERROR(condition, ...) if(condition){ printf("error (" #condition ") " __VA_ARGS__); printf("\n"); exit(-1);}
 #else
-#define PRINTBOOL(b)
-#define PRINTINT(i)
+#define TXIMG_PRINTBOOL(b)
+#define TXIMG_PRINTINT(i)
 #define TXTIMG_ERROR(condition, ...) if(condition){ printf("error: " __VA_ARGS__); printf("\n"); exit(-1); }
 #endif
 
 // character gradient
-char pxvalchars[] = " .,'-~+:;^<=/i![?038$#@";
+char txtimg_char_gradient[] =
+//" .,'-~+:;^<=/i![?038$#@";
+" .'`^\",:;Il!i><~+_-?][}{1)(|\\/tfjrxnuvczXYUJCLQ0OZmwqpdbkhao*#MW&8%B@$";
 
 // pick a character for value from 0.0 to 1.0
-static char eval(float val){
+static char txtimg_evaluate(float val){
 	if(val >= 0.99f) val = 0.99f;
 	else if(val <= 0.01f) val = 0.01f;
-	int idx = val * (sizeof(pxvalchars) - 1);
+	int idx = val * (sizeof(txtimg_char_gradient) - 1);
 
-	return pxvalchars[idx];
+	return txtimg_char_gradient[idx];
 }
 
 // calculate 1D pixel index from 2D position
-static unsigned int pxidx(int x, int y, int imgx, int imgy, int imgch){
+static unsigned int txtimg_px_idx(int x, int y, int imgx, int imgy, int imgch){
 	unsigned int idx = x + (y * imgx);
 	return idx * imgch;
 }
 
 // check if character is digit
-static bool isdigit(char c){
+static bool txtimg_char_is_digit(char c){
 	 return (c >= '0' && c <= '9');
 }
 
-// get number from a string
-unsigned int uint_parse(const char* str){
+// get uint from a string
+unsigned int txtimg_uint_parse(const char* str){
 	unsigned int val = 0;
 	char* end = ((char*)str) + strlen(str);
 
 	unsigned int count = 0;
 	while(end != str){
 		end --;
-		if(isdigit(*end)){
+		if(txtimg_char_is_digit(*end)){
 			val += (((int)*end) - (int)'0') * (int)powf(10, count);
 			count++;
 		}
@@ -58,17 +60,23 @@ unsigned int uint_parse(const char* str){
 	return val;
 }
 
-float logit_function(float x){
+// sharpness function. inverse of sigmoid function, pushes x towards 0 or 1 (which is closer)
+float txtimg_logit_function(float x){
 	return log(x / (1.0f - x));
 }
 
-float lerpf(float s, float e, float t) {
+float txtimg_lerpf(float s, float e, float t) {
 	return (s * (1.0f - t)) + (e * t);
 }
 
 int main(int argc, const char* argv[]){
 	
 	TXTIMG_ERROR(argc <= 1, "no input file");
+
+	if (argc == 1) {
+		printf("hello! if you're wondering how to use this thing, use --help flag when running this program again!\n");
+		return 0;
+	}
 
 	if(argc == 2 && strcmp(argv[1], "--help")<=0){
 		printf(
@@ -81,43 +89,50 @@ int main(int argc, const char* argv[]){
 		return 0;
 	}
 
-
+	// "parse" arguments
 	int step = 6;
-	if(argc >= 3) step = uint_parse(argv[2]);
+	if(argc >= 3) step = txtimg_uint_parse(argv[2]);
 	const int steph = step / 2;
 	const int steparea = (step - 1) *  (steph - 1);
 	float sharpen = 0;
-	if(argc >= 4) sharpen = (float)uint_parse(argv[3]) / 100.0f;
+	if(argc >= 4) sharpen = (float)txtimg_uint_parse(argv[3]) / 100.0f;
 	float multiplier = 1.0f;
-	if(argc >= 5) multiplier = (float)uint_parse(argv[4]) / 100.0f;
+	if(argc >= 5) multiplier = (float)txtimg_uint_parse(argv[4]) / 100.0f;
 
 
+	// load image
 	printf("loading image ... ");
 	int imgx,imgy,imgch;
 	stbi_set_flip_vertically_on_load(true);
 	unsigned char* imgdata = stbi_load(argv[1], &imgx, &imgy, &imgch, 0);
-	if(!imgdata) printf("image loading error: %s\n", stbi_failure_reason());
-	else printf("done\n");
+	if (!imgdata) {
+		printf("failed\n");
+		TXTIMG_ERROR(!imgdata, "when loading image: %s\n", stbi_failure_reason());
+	}
+	else printf("ok\n");
+
 
 	const unsigned int pxcount = imgx * imgy;
 	const unsigned int bcount = pxcount * imgch;
 	
 #ifdef TXTIMG_DEBUG
-	PRINTINT(imgx);
-	PRINTINT(imgy);
-	PRINTINT(imgch);
-	PRINTINT(pxcount);
-	PRINTINT(bcount);
+	TXIMG_PRINTINT(imgx);
+	TXIMG_PRINTINT(imgy);
+	TXIMG_PRINTINT(imgch);
+	TXIMG_PRINTINT(pxcount);
+	TXIMG_PRINTINT(bcount);
 #endif
 
-	for(int y = imgy-step; y > 0; y-= step){
-		for(int x = 0; x < imgx; x+= steph){
-
+	// print image to console
+	for(int y = imgy-step; y > 0; y-= step) {
+		for(int x = 0; x < imgx; x+= steph) {
 			float val = 0;
 			
+			// "anti aliasing"
+			// take average value of all pixels that we skipped
 			for(int aax = x; aax < x + steph - 1; aax ++){
 				for(int aay = y; aay < y + step - 1; aay ++){
-					unsigned int idx = pxidx(aax,aay,imgx,imgy,imgch);
+					unsigned int idx = txtimg_px_idx(aax,aay,imgx,imgy,imgch);
 					
 					TXTIMG_ERROR(idx < 0,"idx = %i, x = %i, y = %i", idx, aax, aay);
 					TXTIMG_ERROR(idx >= bcount, "idx = %i, x = %i, y = %i", idx, aax, aay);
@@ -125,12 +140,13 @@ int main(int argc, const char* argv[]){
                        		}
 			}
 			
+			// modify value by sharpness etc
 			val /= (float)(steparea * 3 * 255);
-			float logit = logit_function(val);
-			val = lerpf(val, logit, sharpen);
+			float logit = txtimg_logit_function(val);
+			val = txtimg_lerpf(val, logit, sharpen);
 			val *= multiplier;
 
-			printf("%c", eval(val));
+			printf("%c", txtimg_evaluate(val));
 		}
 		printf("\n");
 	}
