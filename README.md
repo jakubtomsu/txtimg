@@ -1,4 +1,3 @@
-![GitHub Logo](/logo.png)
 # **TXTIMG - image to text converter**
 **Simple command line program that can turn any image to ascii text.**  
 <br/>
